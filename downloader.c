@@ -94,7 +94,6 @@ void cal_total_size() {
         settings.content_length = res;
     }
 }
-
 void download_manager() {
     // Calculate chunk size
     curl_off_t chunk_size = settings.content_length / settings.max_threads;
@@ -107,12 +106,11 @@ void download_manager() {
     }
 
     for (int i = 0; i < settings.max_threads; i++) {
-        threads_info[i].start = i * chunk_size; // Start of this thread's range
-        threads_info[i].end = (i == settings.max_threads - 1) ? settings.content_length - 1 : (i + 1) * chunk_size - 1; // End of this thread's range
+        threads_info[i].start = i * chunk_size; 
+        threads_info[i].end = (i == settings.max_threads - 1) ? settings.content_length - 1 : (i + 1) * chunk_size - 1; 
         
-        // Allocate buffer for data
-        threads_info[i].size = threads_info[i].end - threads_info[i].start + 1; // Size of the downloaded data
-        threads_info[i].buffer = malloc(threads_info[i].size); // Allocate buffer
+        threads_info[i].size = threads_info[i].end - threads_info[i].start + 1; 
+        threads_info[i].buffer = malloc(threads_info[i].size); 
         if (!threads_info[i].buffer) {
             perror("Failed to allocate buffer");
             exit(EXIT_FAILURE);
@@ -125,9 +123,9 @@ void download_manager() {
         }
     }
 
-    // Wait for all threads to finish using the completed counter
+   
     for (int i = 0; i < settings.max_threads; i++) {
-        pthread_join(threads_info[i].thread, NULL); // Wait for thread to finish
+        pthread_join(threads_info[i].thread, NULL);
     }
 
     // Write combined data to the final file
@@ -138,14 +136,18 @@ void download_manager() {
     }
 
     for (int i = 0; i < settings.max_threads; i++) {
-        fwrite(threads_info[i].buffer, 1, threads_info[i].size, fp_final);
-        free(threads_info[i].buffer); // Free the buffer after writing
+        if (threads_info[i].size > 0) {
+            fwrite(threads_info[i].buffer, 1, threads_info[i].size, fp_final);
+            printf("Wrote %zu bytes from thread %d to final file\n", threads_info[i].size, i);
+        } else {
+            printf("No data to write from thread %d\n", i);
+        }
+        free(threads_info[i].buffer); 
     }
 
     fclose(fp_final);
     free(threads_info); // Clean up
 }
-
 void *worker_thread(void *arg) {
     // Cast argument to thread_info type
     thread_info *info = (thread_info *)arg;
@@ -154,25 +156,27 @@ void *worker_thread(void *arg) {
     if (curl) {
         curl_easy_setopt(curl, CURLOPT_URL, settings.url);
         
-        // Set the range for the download
         char range_str[50];
         snprintf(range_str, sizeof(range_str), "%lld-%lld", info->start, info->end);
         curl_easy_setopt(curl, CURLOPT_RANGE, range_str);
 
-        // Set the write callback to store downloaded data in buffer
+        
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, info->buffer);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL); // Using default write function
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, NULL); 
 
         CURLcode res = curl_easy_perform(curl);
         if (res != CURLE_OK) {
-            fprintf(stderr, "Download failed: %s\n", curl_easy_strerror(res));
+            fprintf(stderr, "Download failed for range %lld-%lld: %s\n", info->start, info->end, curl_easy_strerror(res));
+            info->size = 0; 
+        } else {
+            printf("Downloaded range %lld-%lld to buffer\n", info->start, info->end);
         }
 
         // Clean up
         curl_easy_cleanup(curl);
     }
 
-    // Increase completed counter
+    
     pthread_mutex_lock(&completed_mutex);
     completed_counter++;
     pthread_mutex_unlock(&completed_mutex);
