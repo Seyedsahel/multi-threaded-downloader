@@ -24,7 +24,7 @@ DLSettings settings;
 // --------------------------
 
 void parse_args(int argc, char *argv[]);
-
+curl_off_t cal_total_size();
 
 int main(int argc, char *argv[]) {
     parse_args(argc, argv);
@@ -84,4 +84,24 @@ void parse_args(int argc, char *argv[]) {
   if (settings.max_threads == 0) {
     settings.max_threads = DEFAULT_MAX_THREADS;
   }
+}
+
+curl_off_t cal_total_size(){
+  // Fetch content length
+  CURL *curl = curl_easy_init();
+  curl_easy_setopt(curl, CURLOPT_URL, settings.url);
+  curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
+  curl_easy_perform(curl);
+  curl_off_t res = 0;
+  curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T, &res);
+  curl_easy_cleanup(curl);
+
+  if (res <= 0) {
+    printf("ERROR | Could not fetch content length\n");
+    exit(EXIT_FAILURE);
+  }
+
+  // Calculate chunk size
+  curl_off_t chunk_size = res / settings.max_threads;
+return res;
 }
