@@ -5,18 +5,20 @@
 #include <pthread.h>
 #include <getopt.h>
 // --------------------------
-typedef struct {
-    const char *url;
-    long start;
-    long end;
-    FILE *fp;
-} DownloadArgs; 
 
 typedef struct {
   char *url;        
   char *filename;   
   int max_threads; 
+  FILE *fp;
+  curl_off_t content_length;
 } DLSettings;       // settings for downloader
+
+typedef struct {
+    curl_off_t start;  // Start of byte range
+    curl_off_t end;    // End of byte range
+    pthread_t thread;   // Thread identifier
+} thread_info;
 
 DLSettings settings;   
 // --------------------------
@@ -24,14 +26,16 @@ DLSettings settings;
 // --------------------------
 
 void parse_args(int argc, char *argv[]);
-curl_off_t cal_total_size();
+void cal_total_size();
+void download_manager();
+void *worker_thread(void *arg);
+// --------------------------
 
 int main(int argc, char *argv[]) {
     parse_args(argc, argv);
     printf(settings.filename);
-    curl_off_t res = cal_total_size();
-    printf("Total size: %lld\n", (long long)res);
-  
+    cal_total_size();
+    printf("Total size: %lld\n", (long long)settings.content_length);
     return 0;
 }
 
@@ -84,9 +88,18 @@ void parse_args(int argc, char *argv[]) {
   if (settings.max_threads == 0) {
     settings.max_threads = DEFAULT_MAX_THREADS;
   }
+
+
+// Open output file
+    FILE *fp = fopen(settings.filename, "wb");
+    if (!fp) {
+        perror("Failed to open file");
+       exit(EXIT_FAILURE);
+    }
+    fclose(fp);
 }
 
-curl_off_t cal_total_size(){
+void cal_total_size(){
   // Fetch content length
   CURL *curl = curl_easy_init();
   curl_easy_setopt(curl, CURLOPT_URL, settings.url);
@@ -101,7 +114,16 @@ curl_off_t cal_total_size(){
     exit(EXIT_FAILURE);
   }
 
-  // Calculate chunk size
-  curl_off_t chunk_size = res / settings.max_threads;
-return res;
+  settings.content_length = res;
+
+}
+
+
+void download_manager() {
+    // Calculate chunk size
+    curl_off_t chunk_size = settings.content_length / settings.max_threads;
+}
+
+void *worker_thread(void *arg) {
+   
 }
