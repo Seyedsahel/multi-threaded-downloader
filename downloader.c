@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -158,7 +157,6 @@ void *worker_thread(void *arg) {
         return NULL;
     }
 
-   
     CURL *curl = curl_easy_init();
     if (curl) {
         curl_easy_setopt(curl, CURLOPT_URL, settings.url);
